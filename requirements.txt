@@ -3,50 +3,14 @@ fastapi==0.115.12
 uvicorn==0.34.2
 sqlalchemy==2.0.40
 pydantic==2.11.4
-pydantic_core==2.33.2
 python-dotenv==1.1.0
 
 # Autenticação e Segurança
-python-jose[cryptography]==3.4.0
 passlib[bcrypt]==1.7.4
 bcrypt==4.3.0
-cryptography==44.0.3
-
-# Uploads e Multipart
-python-multipart==0.0.20
-
-# Clima e requisições HTTP
-requests==2.31.0
 
 # Banco de Dados
-psycopg2-binary==2.9.9
-SQLAlchemy-Utils==0.41.2
-
-# Migrações com Alembic
-alembic==1.15.27
-Mako==1.3.10
-
-# Dependências do ambiente
-anyio==4.9.0
-h11==0.16.0
-sniffio==1.3.1
-click==8.1.8
-colorama==0.4.6
-greenlet==3.2.1
-starlette==0.46.2
-typing-inspection==0.4.0
-typing_extensions==4.13.2
+alembic==1.16.4
 
 # Dependências auxiliares
-cffi==1.17.1
-pycparser==2.22
-annotated-types==0.7.0
-six==1.17.0
-idna==3.10
-ecdsa==0.19.1
-pyasn1==0.4.8
-rsa==4.9.1
-
-# Testes e debug
-pytest
-debugpy
+python-multipart==0.0.20
