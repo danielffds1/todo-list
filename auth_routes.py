@@ -1,13 +1,24 @@
 #auth_routes.py
 from fastapi import APIRouter, HTTPException, Depends
 from models import User
-from dependencies import pegar_sessao
+from dependencies import pegar_sessao, verificar_token, criar_token
 from main import bcrypt_context
 from schemas import UserSchema, LoginSchema, UsuarioResponseSchema
 from sqlalchemy.orm import Session
+from datetime import datetime, timedelta, timezone
+from config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
+from fastapi.security import OAuth2PasswordRequestForm
 
 # Tag para identificar as rotas de autenticação no Swagger
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
+
+def autenticar_usuario(email, senha, session):
+    usuario = session.query(User).filter(User.email == email).first()
+    if not usuario:
+        return False
+    if not bcrypt_context.verify(senha, usuario.senha):
+        return False
+    return usuario
 
 @auth_router.get("/")
 async def home():
@@ -44,31 +55,20 @@ async def criar_conta(usuario_schema: UserSchema, session: Session = Depends(peg
         
         return {"mensagem": f"usuário cadastrado com sucesso: {usuario_schema.email}"}
 
-@auth_router.post("/login", response_model=dict)
-async def login(login_schema: LoginSchema, session: Session = Depends(pegar_sessao)):
+@auth_router.post("/login-form")
+async def login_form(data_formulario: OAuth2PasswordRequestForm = Depends(), session:Session = Depends(pegar_sessao)):
     """
     Faz login do usuário
     """
-    # Buscando usuário pelo email
-    usuario = session.query(User).filter(User.email == login_schema.email).first()
-    
+    usuario = autenticar_usuario(data_formulario.username, data_formulario.password, session)
     if not usuario:
         raise HTTPException(status_code=401, detail="Email ou senha incorretos")
-    
-    # Verificando se a senha está correta
-    if not bcrypt_context.verify(login_schema.senha, usuario.senha):
-        raise HTTPException(status_code=401, detail="Email ou senha incorretos")
-    
-    # Verificando se o usuário está ativo
-    if not usuario.ativo:
-        raise HTTPException(status_code=401, detail="Usuário inativo")
-    
-    return {
-        "mensagem": "Login realizado com sucesso",
-        "usuario": {
-            "id": usuario.id,
-            "nome": usuario.nome,
-            "email": usuario.email,
-            "admin": usuario.admin
-        }
-    }
+    else:
+        access_token = criar_token(usuario.id)
+        return {"access_token": access_token, "token_type": "Bearer"}
+
+@auth_router.get("/refresh")
+async def use_refresh_token(usuario: User = Depends(verificar_token)):
+    access_token = criar_token(usuario.id)
+
+    return {"access_token": access_token, "token_type": "Bearer"}
