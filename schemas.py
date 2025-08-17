@@ -1,6 +1,6 @@
 #schemas.py
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
 # Schema para criação de usuário
@@ -66,6 +66,20 @@ class TodoResponseSchema(BaseModel):
     suggestion: Optional[str]
     created_at: datetime
     updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# Schema para histórico de tarefas
+class TodoHistorySchema(BaseModel):
+    id: str
+    todo_id: str
+    user_id: str
+    action: str
+    field_name: Optional[str] = None
+    old_value: Optional[str] = None
+    new_value: Optional[str] = None
+    created_at: datetime
 
     class Config:
         from_attributes = True

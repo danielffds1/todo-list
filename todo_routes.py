@@ -2,8 +2,8 @@
 from fastapi import APIRouter, HTTPException, Depends, Query
 from sqlalchemy.orm import Session
 from dependencies import pegar_sessao, verificar_token
-from schemas import TodoSchema, TodoUpdateSchema, TodoResponseSchema
-from models import Todo, User
+from schemas import TodoSchema, TodoUpdateSchema, TodoResponseSchema, TodoHistorySchema
+from models import Todo, User, TodoHistory
 from datetime import datetime, date
 from typing import List, Optional
 from pydantic import BaseModel
@@ -89,6 +89,22 @@ def gerar_sugestao_clima(activity_type: str, city: str) -> str:
     except Exception as e:
         return f"Erro ao verificar o clima: {str(e)}"
 
+# Função para registrar histórico
+def registrar_historico(session: Session, todo_id: str, user_id: str, action: str, field_name: str = None, old_value: str = None, new_value: str = None):
+    """
+    Registra uma entrada no histórico de uma tarefa
+    """
+    historico = TodoHistory(
+        todo_id=todo_id,
+        user_id=user_id,
+        action=action,
+        field_name=field_name,
+        old_value=old_value,
+        new_value=new_value
+    )
+    session.add(historico)
+    session.commit()
+
 # CRIAR TODO
 @todo_router.post("/", response_model=TodoResponseSchema)
 async def criar_todo(
@@ -113,6 +129,17 @@ async def criar_todo(
     session.add(novo_todo)
     session.commit()
     session.refresh(novo_todo)
+
+    # Registrar criação no histórico
+    registrar_historico(
+        session=session,
+        todo_id=novo_todo.id,
+        user_id=current_user.id,
+        action="created",
+        field_name="tarefa_completa",
+        old_value=None,
+        new_value=f"Tarefa criada: {novo_todo.title}"
+    )
 
     return novo_todo
 
@@ -195,8 +222,20 @@ async def atualizar_todo(
     if not todo:
         raise HTTPException(status_code=404, detail="Tarefa não encontrada")
     
+    # Registrar mudanças no histórico
     for field, value in todo_data.model_dump().items():
         if value is not None:
+            old_value = getattr(todo, field)
+            if old_value != value:
+                registrar_historico(
+                    session=session,
+                    todo_id=todo_id,
+                    user_id=current_user.id,
+                    action="updated",
+                    field_name=field,
+                    old_value=str(old_value),
+                    new_value=str(value)
+                )
             setattr(todo, field, value)
 
     todo.updated_at = datetime.now()
@@ -219,6 +258,17 @@ async def deletar_todo(
     
     if not todo:
         raise HTTPException(status_code=404, detail="Tarefa não encontrada")
+    
+    # Registrar exclusão no histórico
+    registrar_historico(
+        session=session,
+        todo_id=todo_id,
+        user_id=current_user.id,
+        action="deleted",
+        field_name="tarefa_completa",
+        old_value=f"Tarefa: {todo.title}",
+        new_value=None
+    )
     
     session.delete(todo)
     session.commit()
@@ -436,3 +486,51 @@ async def listar_todos_admin(
     
     todos = session.query(Todo).order_by(Todo.created_at.desc()).all()
     return todos
+
+# Endpoints para estatísticas
+@todo_router.get("/estatisticas")
+async def obter_estatisticas(current_user: User = Depends(verificar_token)):
+    # Total de tarefas, concluídas, pendentes, etc.
+    pass # Placeholder for actual implementation
+
+# NOVO ENDPOINT: Obter histórico de uma tarefa
+@todo_router.get("/{todo_id}/historico", response_model=List[TodoHistorySchema])
+async def obter_historico_tarefa(
+    todo_id: str,
+    session: Session = Depends(pegar_sessao),
+    current_user: User = Depends(verificar_token)
+):
+    """
+    Obtém o histórico completo de uma tarefa
+    """
+    # Verificar se a tarefa existe e pertence ao usuário
+    todo = session.query(Todo).filter(
+        Todo.id == todo_id, 
+        Todo.user_id == current_user.id
+    ).first()
+    
+    if not todo:
+        raise HTTPException(status_code=404, detail="Tarefa não encontrada")
+    
+    # Buscar histórico da tarefa
+    historico = session.query(TodoHistory).filter(
+        TodoHistory.todo_id == todo_id
+    ).order_by(TodoHistory.created_at.desc()).all()
+    
+    return historico
+
+# NOVO ENDPOINT: Obter histórico de todas as tarefas do usuário
+@todo_router.get("/historico/geral", response_model=List[TodoHistorySchema])
+async def obter_historico_geral(
+    session: Session = Depends(pegar_sessao),
+    current_user: User = Depends(verificar_token),
+    limit: int = Query(50, description="Limite de registros")
+):
+    """
+    Obtém o histórico de todas as tarefas do usuário
+    """
+    historico = session.query(TodoHistory).filter(
+        TodoHistory.user_id == current_user.id
+    ).order_by(TodoHistory.created_at.desc()).limit(limit).all()
+    
+    return historico

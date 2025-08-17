@@ -1,5 +1,5 @@
 #models.py
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, ForeignKey, Boolean
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, ForeignKey, Boolean, Text
 from sqlalchemy.orm import relationship, sessionmaker, declarative_base
 from enum import Enum
 from datetime import datetime
@@ -56,3 +56,25 @@ class Todo(Base):
         self.suggestion = suggestion
         self.created_at = datetime.now()
         self.updated_at = datetime.now()
+
+class TodoHistory(Base):
+    __tablename__ = 'todo_history'
+
+    id = Column('id', String, primary_key=True)
+    todo_id = Column('todo_id', String, ForeignKey('todos.id'))
+    user_id = Column('user_id', String, ForeignKey('usuarios.id'))
+    action = Column('action', String, nullable=False)  # 'created', 'updated', 'deleted', 'status_changed'
+    field_name = Column('field_name', String)  # 'title', 'description', 'status', etc.
+    old_value = Column('old_value', Text)
+    new_value = Column('new_value', Text)
+    created_at = Column('created_at', DateTime, default=datetime.now)
+
+    def __init__(self, todo_id, user_id, action, field_name=None, old_value=None, new_value=None):
+        self.id = str(uuid.uuid4())
+        self.todo_id = todo_id
+        self.user_id = user_id
+        self.action = action
+        self.field_name = field_name
+        self.old_value = old_value
+        self.new_value = new_value
+        self.created_at = datetime.now()
