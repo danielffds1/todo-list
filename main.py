@@ -30,7 +30,9 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login-form")
 # Importa as rotas
 from auth_routes import auth_router
 from todo_routes import todo_router
+from weather_routes import weather_router
 
 # inclusão das rotas pelo FastAPI
 app.include_router(auth_router)
 app.include_router(todo_router)
+app.include_router(weather_router)
